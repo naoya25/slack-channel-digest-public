@@ -1,0 +1,28 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "slack-channel-digest",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-04-11",
+	"observability": {
+		"enabled": true
+	},
+	"triggers": {
+		"crons": [
+			"0 21 * * *",
+			"0 3 * * *"
+		]
+	},
+	"upload_source_maps": true,
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"kv_namespaces": [
+		{
+			"binding": "THREAD_STORE",
+			"id": "c836bab38e4b44af84a286cf97c1dfcf"
+		}
+	],
+	"vars": {
+		"CHANNELS_CONFIG": "[{\"channelId\":\"C0AP4C8HJR2\",\"type\":\"structured-digest\",\"label\":\"日報\",\"canvasId\":\"F0ARVAA4MAB\",\"digestChannelId\":\"C0AS9JMUZV0\"}]"
+	}
+}

@@ -1,0 +1,4 @@
+SLACK_BOT_TOKEN="xoxb-xxxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx"
+OPENAI_API_KEY="sk-proj-xxxx"
+
+CHANNELS_CONFIG='[{"channelId":"C_SOURCE","type":"structured-digest","label":"日報","canvasId":"F_CANVAS","digestChannelId":"C_DIGEST"}]'
