@@ -8,6 +8,7 @@ export interface MorningThreadRecord {
 	canvasData?: {
 		dateStats: string;
 		perUser: Record<string, { displayName: string; coreSummary: string }>;
+		similarGroups?: Array<{ userIds: string[]; rationale: string }>;
 	};
 }
 

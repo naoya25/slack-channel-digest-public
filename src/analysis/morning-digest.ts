@@ -28,6 +28,7 @@ export async function runMorningDigest(input: MorningAnalysisInput): Promise<Mor
 		return {
 			dateStats: `**${dateLabel} の日報**\n\n対象の投稿がありませんでした。`,
 			perUser: new Map(),
+			similarGroups: [],
 		};
 	}
 
@@ -88,5 +89,5 @@ export async function runMorningDigest(input: MorningAnalysisInput): Promise<Mor
 		perUser.set(e.userId, block);
 	}
 
-	return { dateStats, perUser };
+	return { dateStats, perUser, similarGroups: synthesis.similarGroups };
 }
