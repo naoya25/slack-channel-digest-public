@@ -44,7 +44,7 @@ export async function runEveningDigest(input: EveningAnalysisInput): Promise<Eve
 				{ role: 'system', content: system },
 				{ role: 'user', content: user },
 			],
-			{ jsonMode: true, maxTokens: 1200 },
+			{ jsonMode: true },
 		);
 
 		const parsed = parsePersonExtraction(raw, username);
@@ -63,7 +63,7 @@ export async function runEveningDigest(input: EveningAnalysisInput): Promise<Eve
 			{ role: 'system', content: sys2 },
 			{ role: 'user', content: user2 },
 		],
-		{ jsonMode: true, maxTokens: 2200 },
+		{ jsonMode: true },
 	);
 
 	let synthesis = parseTeamSynthesis(raw2);

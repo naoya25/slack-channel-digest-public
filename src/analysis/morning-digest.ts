@@ -47,7 +47,7 @@ export async function runMorningDigest(input: MorningAnalysisInput): Promise<Mor
 				{ role: 'system', content: system },
 				{ role: 'user', content: user },
 			],
-			{ jsonMode: true, maxTokens: 900 },
+			{ jsonMode: true },
 		);
 
 		const parsed = parsePersonExtraction(raw, username);
@@ -66,7 +66,7 @@ export async function runMorningDigest(input: MorningAnalysisInput): Promise<Mor
 			{ role: 'system', content: sys2 },
 			{ role: 'user', content: user2 },
 		],
-		{ jsonMode: true, maxTokens: 2000 },
+		{ jsonMode: true },
 	);
 
 	let synthesis = parseTeamSynthesis(raw2);

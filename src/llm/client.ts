@@ -28,7 +28,6 @@ export async function chatCompletion(
 	messages: LLMMessage[],
 	options?: {
 		model?: string;
-		maxTokens?: number;
 		jsonMode?: boolean;
 	},
 ): Promise<string> {
