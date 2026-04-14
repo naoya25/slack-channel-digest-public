@@ -12,6 +12,37 @@ export function createJapanAIClient(apiKey: string, userId: string): JapanAIClie
 	return { apiKey, userId };
 }
 
+const RETRY_MAX = 4;
+const RETRY_BASE_MS = 1_000;
+const RETRY_MAX_MS = 30_000;
+
+/** リトライ対象かどうか（ネットワーク例外・429・5xx） */
+function isRetryable(err: unknown): boolean {
+	if (err instanceof RetryableHttpError) return true;
+	// fetch 自体が投げるネットワーク例外
+	if (err instanceof TypeError) return true;
+	return false;
+}
+
+class RetryableHttpError extends Error {
+	constructor(
+		readonly status: number,
+		message: string,
+		readonly retryAfterMs?: number,
+	) {
+		super(message);
+	}
+}
+
+/** 指数バックオフ（±10% ジッター）、Retry-After があればそちらを優先 */
+function backoffMs(attempt: number, retryAfterMs?: number): number {
+	if (retryAfterMs != null) return Math.min(retryAfterMs, RETRY_MAX_MS);
+	const exp = Math.min(RETRY_BASE_MS * 2 ** attempt, RETRY_MAX_MS);
+	return exp * (0.9 + Math.random() * 0.2); // ±10% jitter
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
 /**
  * jsonMode 応答を正規化する。
  * コードフェンス除去 → 最初の {...} / [...] 抽出 → JSON.parse で検証。
@@ -68,34 +99,55 @@ export async function chatCompletion(
 	);
 
 	const prompt = messagesToPrompt(messages, jsonMode);
+	const body = JSON.stringify({ prompt, model, userId: client.userId });
 
-	try {
-		const res = await fetch(JAPAN_AI_API_URL, {
-			method: 'POST',
-			headers: {
-				Authorization: `Bearer ${client.apiKey}`,
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ prompt, model, userId: client.userId }),
-		});
-
-		if (!res.ok) {
-			const body = await res.text().catch(() => '(body unreadable)');
-			throw new Error(`JAPAN AI API error: ${res.status} ${res.statusText} — ${body}`);
+	let lastErr: unknown;
+	for (let attempt = 0; attempt <= RETRY_MAX; attempt++) {
+		if (attempt > 0) {
+			const delay = backoffMs(attempt - 1, lastErr instanceof RetryableHttpError ? lastErr.retryAfterMs : undefined);
+			console.warn(`[LLM] retry ${attempt}/${RETRY_MAX} — waiting ${Math.round(delay)}ms`);
+			await sleep(delay);
 		}
 
-		const data = (await res.json()) as { status?: string; chatMessage?: string };
+		try {
+			const res = await fetch(JAPAN_AI_API_URL, {
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${client.apiKey}`,
+					'Content-Type': 'application/json',
+				},
+				body,
+			});
 
-		if (data.status && data.status !== 'succeeded') {
-			throw new Error(`JAPAN AI API returned status="${data.status}"`);
+			if (!res.ok) {
+				const text = await res.text().catch(() => '(body unreadable)');
+				if (res.status === 429 || res.status >= 500) {
+					const retryAfterSec = res.headers.get('Retry-After');
+					const retryAfterMs = retryAfterSec != null ? parseFloat(retryAfterSec) * 1000 : undefined;
+					throw new RetryableHttpError(res.status, `JAPAN AI API error: ${res.status} ${res.statusText} — ${text}`, retryAfterMs);
+				}
+				throw new Error(`JAPAN AI API error: ${res.status} ${res.statusText} — ${text}`);
+			}
+
+			const data = (await res.json()) as { status?: string; chatMessage?: string };
+
+			if (data.status && data.status !== 'succeeded') {
+				throw new Error(`JAPAN AI API returned status="${data.status}"`);
+			}
+
+			const raw = data.chatMessage ?? '';
+			const out = jsonMode ? extractJson(raw) : raw;
+			console.log(`[LLM] response — outChars=${out.length}`);
+			return out;
+		} catch (err) {
+			lastErr = err;
+			if (!isRetryable(err) || attempt === RETRY_MAX) {
+				console.error(`[LLM] chatCompletion failed: ${formatErrorChain(err)}`);
+				throw err;
+			}
 		}
-
-		const raw = data.chatMessage ?? '';
-		const out = jsonMode ? extractJson(raw) : raw;
-		console.log(`[LLM] response — outChars=${out.length}`);
-		return out;
-	} catch (err) {
-		console.error(`[LLM] chatCompletion failed: ${formatErrorChain(err)}`);
-		throw err;
 	}
+
+	// ループを抜けることはないが TypeScript の型推論を満たすために
+	throw lastErr;
 }
