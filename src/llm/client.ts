@@ -1,19 +1,30 @@
-import OpenAI from 'openai';
 import type { LLMMessage } from '../types/llm';
 import { formatErrorChain } from '../utils/format-error-for-log';
 
-export function createOpenAIClient(apiKey: string): OpenAI {
-	return new OpenAI({
-		apiKey,
-		// nodejs_compat 下で Node の fetch が選ばれると Workers 外の挙動になり得るため明示
-		fetch: globalThis.fetch,
-		// 一時的な接続切れ向け（デフォルト 2 に上乗せ）
-		maxRetries: 4,
-	});
+const JAPAN_AI_API_URL = 'https://api.japan-ai.co.jp/chat/v2';
+
+export interface JapanAIClient {
+	apiKey: string;
+	userId: string;
+}
+
+export function createJapanAIClient(apiKey: string, userId: string): JapanAIClient {
+	return { apiKey, userId };
+}
+
+/** messages 配列を JAPAN AI の単一 prompt 文字列に変換する */
+function messagesToPrompt(messages: LLMMessage[], jsonMode: boolean): string {
+	const systemParts = messages.filter((m) => m.role === 'system').map((m) => m.content);
+	const otherParts = messages.filter((m) => m.role !== 'system').map((m) => m.content);
+	let prompt = [...systemParts, ...otherParts].join('\n\n');
+	if (jsonMode) {
+		prompt += '\n\n必ず有効なJSONオブジェクトのみを返してください。説明文は不要です。';
+	}
+	return prompt;
 }
 
 export async function chatCompletion(
-	client: OpenAI,
+	client: JapanAIClient,
 	messages: LLMMessage[],
 	options?: {
 		model?: string;
@@ -21,30 +32,45 @@ export async function chatCompletion(
 		jsonMode?: boolean;
 	},
 ): Promise<string> {
-	const model = options?.model ?? 'gpt-4o-mini';
-	const maxTokens = options?.maxTokens ?? 800;
+	const model = options?.model ?? 'gemini-2.5-flash';
 	const jsonMode = Boolean(options?.jsonMode);
 
 	const charsByRole = messages.map((m) => ({ role: m.role, chars: m.content.length }));
 	const totalChars = charsByRole.reduce((s, x) => s + x.chars, 0);
 	const roleSummary = charsByRole.map((x) => `${x.role}=${x.chars}`).join(', ');
 	console.log(
-		`[LLM] request — model=${model} max_tokens=${maxTokens} jsonMode=${jsonMode} | ` +
+		`[LLM] request — model=${model} jsonMode=${jsonMode} | ` +
 			`messages=${messages.length} totalChars=${totalChars} (${roleSummary})`,
 	);
 
+	const prompt = messagesToPrompt(messages, jsonMode);
+
 	try {
-		const response = await client.chat.completions.create({
-			model,
-			messages,
-			max_tokens: maxTokens,
-			...(jsonMode ? { response_format: { type: 'json_object' as const } } : {}),
+		const res = await fetch(JAPAN_AI_API_URL, {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${client.apiKey}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ prompt, model, userId: client.userId }),
 		});
-		const out = response.choices[0]?.message?.content ?? '';
+
+		if (!res.ok) {
+			const body = await res.text().catch(() => '(body unreadable)');
+			throw new Error(`JAPAN AI API error: ${res.status} ${res.statusText} — ${body}`);
+		}
+
+		const data = (await res.json()) as { status?: string; chatMessage?: string };
+
+		if (data.status && data.status !== 'succeeded') {
+			throw new Error(`JAPAN AI API returned status="${data.status}"`);
+		}
+
+		const out = data.chatMessage ?? '';
 		console.log(`[LLM] response — outChars=${out.length}`);
 		return out;
 	} catch (err) {
-		console.error(`[LLM] chat.completions.create failed: ${formatErrorChain(err)}`);
+		console.error(`[LLM] chatCompletion failed: ${formatErrorChain(err)}`);
 		throw err;
 	}
 }

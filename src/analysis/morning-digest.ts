@@ -1,5 +1,5 @@
 import type { MorningAnalysisInput, MorningAnalysisOutput } from '../types/digest';
-import { createOpenAIClient, chatCompletion } from '../llm/client';
+import { createJapanAIClient, chatCompletion } from '../llm/client';
 import { groupBy } from '../utils/group-by';
 import { mapWithConcurrency } from '../utils/map-with-concurrency';
 import { buildMorningPersonPass1Prompt, buildTeamPass2Prompt } from './digest-llm/prompts';
@@ -21,7 +21,7 @@ const MAX_CONTEXT_CHARS = 14_000;
  * 朝会向け分析: 前営業日の日報から Pass1（個人の時系列・特徴）→ Pass2（類似・知見マッチング）を経て Canvas 用 Markdown を組み立てる。
  */
 export async function runMorningDigest(input: MorningAnalysisInput): Promise<MorningAnalysisOutput> {
-	const { messages, users, dateLabel, openaiApiKey } = input;
+	const { messages, users, dateLabel, llmApiKey, llmUserId } = input;
 	const userMessages = groupBy(messages, (m) => m.user);
 
 	if (userMessages.size === 0) {
@@ -31,7 +31,7 @@ export async function runMorningDigest(input: MorningAnalysisInput): Promise<Mor
 		};
 	}
 
-	const llm = createOpenAIClient(openaiApiKey);
+	const llm = createJapanAIClient(llmApiKey, llmUserId);
 	const validIds = new Set(userMessages.keys());
 
 	const entries = Array.from(userMessages.entries());

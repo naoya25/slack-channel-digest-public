@@ -34,7 +34,8 @@ export async function handleCron(env: Env): Promise<void> {
 				channelConfig: channel,
 				targetDate,
 				ingestPeriodLabelJa,
-				openaiApiKey: env.OPENAI_API_KEY,
+				llmApiKey: env.JAPANAI_API_KEY,
+				llmUserId: env.JAPANAI_USER_ID,
 			});
 
 			// 3. 出力: チャンネル設定の Webhook があればそこへ、なければ Canvas のみ

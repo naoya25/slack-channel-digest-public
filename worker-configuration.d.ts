@@ -7,7 +7,8 @@ declare namespace Cloudflare {
 	}
 	interface Env {
 		SLACK_BOT_TOKEN: string;
-		OPENAI_API_KEY: string;
+		JAPANAI_API_KEY: string;
+		JAPANAI_USER_ID: string;
 		CHANNELS_CONFIG: string;
 	}
 }
@@ -16,7 +17,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "SLACK_BOT_TOKEN" | "OPENAI_API_KEY" | "CHANNELS_CONFIG">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "SLACK_BOT_TOKEN" | "JAPANAI_API_KEY" | "JAPANAI_USER_ID" | "CHANNELS_CONFIG">> {}
 }
 
 // Begin runtime types

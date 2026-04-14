@@ -1,5 +1,5 @@
 import type { AnalysisInput, AnalysisOutput } from '../../types/analysis';
-import { createOpenAIClient, chatCompletion } from '../../llm/client';
+import { createJapanAIClient, chatCompletion } from '../../llm/client';
 import { groupBy } from '../../utils/group-by';
 import { buildStructuredIngestBatchPass1Prompt, buildTeamPass2Prompt } from '../digest-llm/prompts';
 import {
@@ -36,9 +36,9 @@ function splitIntoAtMostChunks<T>(items: T[], maxChunks: number): T[][] {
 
 /** ingest 済みメッセージから Pass 1/2 の LLM 処理を経て Canvas / Webhook 用 Markdown を生成する */
 export async function runStructuredDigest(input: AnalysisInput): Promise<AnalysisOutput> {
-	const { messages, users, targetDate, ingestPeriodLabelJa, openaiApiKey, channelConfig } = input;
+	const { messages, users, targetDate, ingestPeriodLabelJa, llmApiKey, llmUserId, channelConfig } = input;
 	const label = channelConfig.label;
-	const llm = createOpenAIClient(openaiApiKey);
+	const llm = createJapanAIClient(llmApiKey, llmUserId);
 
 	const userMessages = groupBy(messages, (m) => m.user);
 

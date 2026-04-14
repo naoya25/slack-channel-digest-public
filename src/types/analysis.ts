@@ -11,7 +11,8 @@ export interface AnalysisInput {
 	targetDate: Date;
 	/** プロンプト・レポートに載せる取得期間の説明（例: JST の日付レンジ） */
 	ingestPeriodLabelJa: string;
-	openaiApiKey: string;
+	llmApiKey: string;
+	llmUserId: string;
 }
 
 /** 分析処理の出力（Canvas / Webhook へ渡す Markdown） */
