@@ -100,7 +100,7 @@ Canvas はチャンネルメンバーが参照する**オープンな場所**に
 ### Phase 0: 前提確認（着手前チェック）
 
 - [x] Slack Bot（プロジェクト用アプリ）の権限: `canvas:write`だけ足りなそうだったので申請済
-- [x] OpenAI APIキー: ~~開発メンバー個人のキーで当面運用~~ → 共同開発者のキーを GitHub Secrets に登録予定（`OPENAI_API_KEY`）
+- [x] JAPAN AI CHAT APIキー: `JAPANAI_API_KEY`（API キー）と `JAPANAI_USER_ID`（マイページのメールアドレス）を Cloudflare Secrets に登録
   - [ ] 今後の展望として、ローカルで動くLLMを使うと完全無料でいけそう
 - [x] Node.js 20.19 以上（`package.json` の `engines` / `.nvmrc`。ESLint 10 など開発依存の下限）・Wrangler CLIが入っているか
   - [x] `node -v` / `wrangler --version`
@@ -154,7 +154,8 @@ CHANNELS_CONFIG = '[{"channelId":"C000000001","type":"structured-digest","canvas
 
 ```bash
 wrangler secret put SLACK_BOT_TOKEN  # xoxb- で始まるBot User OAuth Token
-wrangler secret put OPENAI_API_KEY   # OpenAI の APIキー
+wrangler secret put JAPANAI_API_KEY  # JAPAN AI CHAT の API キー
+wrangler secret put JAPANAI_USER_ID  # JAPAN AI マイページのメールアドレス
 ```
 
 ---
@@ -311,7 +312,8 @@ HTTP エンドポイントを公開するボットではないので、**「sche
 ```bash
 # .dev.vars
 SLACK_BOT_TOKEN=xoxb-...
-OPENAI_API_KEY=sk-...
+JAPANAI_API_KEY=...
+JAPANAI_USER_ID=your-email@example.com
 ```
 
 2. **起動時に `scheduled` を1回実行**する（本番の Cron 時刻を待たない）。
@@ -338,7 +340,7 @@ npx wrangler deploy
   - 一つの bot で複数の無関係な機能を持たせるのは運用上よくない場合がある
   - Bot のトークンを差し替えれば切り替え可能なので、まず本プロジェクトを完遂してから再検討でもよい
 - LLM 何使うか
-  - ~~一旦 gpt-4o-mini でいいかと思っているけど何か提案あれば聞くつもり~~ → `openai` npm パッケージ + gpt-4o-mini で確定。API キーは GitHub Secrets（`OPENAI_API_KEY`）に登録予定
+  - ~~一旦 gpt-4o-mini でいいかと思っているけど何か提案あれば聞くつもり~~ → ~~`openai` npm パッケージ + gpt-4o-mini で確定~~ → JAPAN AI CHAT（`gemini-2.5-flash`）に移行。`JAPANAI_API_KEY` / `JAPANAI_USER_ID` を Cloudflare Secrets に登録
 - 共同開発での役割分担
   - ~~共同開発がむずそうすぎる~~ → コード実装を先に完成させ、デプロイ・インフラ時に発生した issue を A/B で分担予定
   - 案: 基盤系と分析系で分ける
