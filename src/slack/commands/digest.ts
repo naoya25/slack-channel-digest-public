@@ -136,7 +136,7 @@ function normalizeChannelId(raw: string): string | null {
 function sanitizeLabel(label: string): string {
 	// Markdown記号を削除（*、_、`、~、[、]など）
 	let sanitized = label
-		.replace(/[*_`~\[\]]/g, '')
+		.replace(/[*_`~[\]]/g, '')
 		.trim();
 
 	// 100文字以内に制限

@@ -16,12 +16,12 @@ export async function loadChannelRegistry(kv: KVNamespace): Promise<ChannelRegis
 			if (raw) {
 				try {
 					entries.push(JSON.parse(raw) as ChannelRegistryEntry);
-				} catch (err) {
+				} catch {
 					console.error(`[kv-channel-registry] Failed to parse entry ${key.name}:`, raw);
 				}
 			}
 		}
-		cursor = (result as any).cursor;
+		cursor = (result as unknown).cursor as string | undefined;
 	} while (cursor);
 	return entries;
 }
