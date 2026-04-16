@@ -40,7 +40,7 @@ export async function handleMorningCron(env: Env): Promise<void> {
 			const users = await fetchUsers(slackClient, userIds, env.THREAD_STORE);
 
 			// 2. 分析
-			const { dateStats, perUser } = await runMorningDigest({
+			const { dateStats, perUser, similarGroups } = await runMorningDigest({
 				messages,
 				users,
 				dateLabel,
@@ -49,6 +49,7 @@ export async function handleMorningCron(env: Env): Promise<void> {
 
 			const canvasData = {
 				dateStats,
+				similarGroups,
 				perUser: Object.fromEntries(
 					Array.from(perUser.entries()).map(([userId, coreSummary]) => [
 						userId,

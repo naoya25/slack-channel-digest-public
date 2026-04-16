@@ -21,6 +21,8 @@ export interface MorningAnalysisOutput {
 	dateStats: string;
 	/** userId → 個人のコアサマリー（Markdown）— 各ユーザーのスレッドに投稿 */
 	perUser: Map<string, string>;
+	/** Pass2 の類似グループ（スイムレーン表示用） */
+	similarGroups: Array<{ userIds: string[]; rationale: string }>;
 }
 
 // ---------------------------------------------------------------------------
