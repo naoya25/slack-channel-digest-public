@@ -36,11 +36,16 @@ export const digestCommandLazy: SlashCommandLazyHandler<Env> = async (req) => {
 				responseText = 'Invalid subcommand. Usage: `/digest register <channel_id> <label>`, `/digest unregister <channel_id>`, `/digest list`';
 				break;
 		}
-		await req.context.respond({ text: responseText });
+		try {
+			await req.context.respond({ text: responseText });
+		} catch (respondErr) {
+			console.error('[digest] respond() failed:', respondErr);
+			throw respondErr;
+		}
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
 		console.error('[digest] Error:', msg);
-		await req.context.respond({ text: `Error: ${msg}` });
+		await req.context.respond({ text: 'Command failed. Please try again.' });
 	}
 };
 
@@ -53,7 +58,7 @@ async function handleRegister(
 	}
 
 	const channelId = normalizeChannelId(parts[1]);
-	const label = parts.slice(2).join(' ');
+	const label = sanitizeLabel(parts.slice(2).join(' '));
 
 	if (!channelId) {
 		return 'Invalid channel ID format. Expected `C0AP4C8HJR2` or `<#C0...|name>`';
@@ -83,7 +88,7 @@ async function handleUnregister(
 
 	const removed = await removeChannelFromRegistry(req.env.THREAD_STORE, channelId);
 	if (!removed) {
-		return `Channel ${channelId} is not registered.`;
+		return '❌ Unregister failed. Channel may not exist or already removed.';
 	}
 
 	return `✓ Unregistered channel ${channelId}.`;
@@ -110,16 +115,34 @@ async function handleList(req: Parameters<SlashCommandLazyHandler<Env>>[0]): Pro
  * `C0AP4C8HJR2` 形式か `<#C0AP4C8HJR2|name>` 形式を受け付ける。
  */
 function normalizeChannelId(raw: string): string | null {
-	// 既に C で始まる ID 形式なら OK
-	if (/^C[A-Z0-9]+$/.test(raw)) {
+	// 既に C で始まる ID 形式なら OK（C + 8文字のみ）
+	if (/^C[A-Z0-9]{8}$/.test(raw)) {
 		return raw;
 	}
 
-	// <#C...|...> メンション形式を抽出
-	const match = /<#(C[A-Z0-9]+)\|/.exec(raw);
+	// <#C...|...> メンション形式を抽出（C + 8文字のみ）
+	const match = /<#(C[A-Z0-9]{8})\|/.exec(raw);
 	if (match) {
 		return match[1];
 	}
 
 	return null;
+}
+
+/**
+ * ラベル入力をサニタイズ。
+ * Markdown記号を削除し、100文字以内に制限する。
+ */
+function sanitizeLabel(label: string): string {
+	// Markdown記号を削除（*、_、`、~、[、]など）
+	let sanitized = label
+		.replace(/[*_`~[\]]/g, '')
+		.trim();
+
+	// 100文字以内に制限
+	if (sanitized.length > 100) {
+		sanitized = sanitized.substring(0, 100);
+	}
+
+	return sanitized;
 }

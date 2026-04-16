@@ -1,4 +1,4 @@
-import { parseChannelsConfig } from '../utils/parse-channels-config';
+import { resolveChannels } from '../utils/resolve-channels';
 import { createSlackClient } from '../slack/ingest/client';
 import { fetchHistory } from '../slack/ingest/history';
 import { fetchUsers } from '../slack/ingest/users';
@@ -8,9 +8,9 @@ import { runStructuredDigest } from '../analysis/structured-digest';
 import { getIngestWindowForChannel } from '../utils/ingest-window';
 
 export async function handleCron(env: Env): Promise<void> {
-	const channels = parseChannelsConfig(env.CHANNELS_CONFIG);
+	const channels = await resolveChannels(env);
 	if (channels.length === 0) {
-		console.warn('CHANNELS_CONFIG is empty — no channels to process');
+		console.warn('No channels registered — no channels to process');
 		return;
 	}
 

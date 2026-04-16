@@ -21,18 +21,19 @@ export async function handleEveningCron(env: Env): Promise<void> {
 	}
 
 	for (const channel of channels) {
+		const PREFIX = `[${channel.label}][Evening]`;
 		if (!channel.canvasId) {
-			console.warn(`[${channel.label}][Evening] canvasId が未設定 — スキップ`);
+			console.warn(`${PREFIX} canvasId が未設定 — スキップ`);
 			continue;
 		}
 
 		try {
 			const { dateLabel, isoDate } = getPreviousBusinessDay();
-			console.log(`[${channel.label}][Evening] Start — date: ${dateLabel}`);
+			console.log(`${PREFIX} Start — date: ${dateLabel}`);
 
 			const morningRecord = await loadMorningThreads(env.THREAD_STORE, isoDate, channel.channelId);
 			if (!morningRecord?.canvasData) {
-				console.warn(`[${channel.label}][Evening] KV に朝会 canvasData なし（${isoDate}）— スキップ`);
+				console.warn(`${PREFIX} KV に朝会 canvasData なし（${isoDate}）— スキップ`);
 				continue;
 			}
 
@@ -40,7 +41,7 @@ export async function handleEveningCron(env: Env): Promise<void> {
 			const slackClient = createSlackClient(env.SLACK_BOT_TOKEN);
 			const { oldest, latest } = getFiscalYearToDateWindow();
 			const messages = await fetchHistory(slackClient, channel.channelId, oldest, latest);
-			console.log(`[${channel.label}][Evening] Fetched ${messages.length} messages (FY-to-date)`);
+			console.log(`${PREFIX} Fetched ${messages.length} messages (FY-to-date)`);
 
 			const userIds = [...new Set(messages.map((m) => m.user))];
 			const users = await fetchUsers(slackClient, userIds, env.THREAD_STORE);
@@ -69,11 +70,11 @@ export async function handleEveningCron(env: Env): Promise<void> {
 				eveningData,
 			);
 			await updateCanvas(slackClient, channel.canvasId, eveningMarkdown);
-			console.log(`[${channel.label}][Evening] Canvas updated — ${channel.canvasId}`);
+			console.log(`${PREFIX} Canvas updated — ${channel.canvasId}`);
 
 		} catch (err) {
 			console.error(
-				`[${channel.label}][Evening] Failed: ${formatErrorChain(err)}`,
+				`${PREFIX} Failed: ${formatErrorChain(err)}`,
 				err,
 			);
 		}
