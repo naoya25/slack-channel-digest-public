@@ -1,11 +1,18 @@
 import type { ChannelConfig, ChannelRegistryEntry } from '../types/channel';
 import { loadChannelRegistry } from './kv-channel-registry';
 
+// リクエスト単位のレジストリキャッシュ（WeakMap使用）
+const registryCache = new WeakMap<KVNamespace, ChannelRegistryEntry[]>();
+
 /**
- * KV レジストリからチャンネル設定を取得する。
+ * KV レジストリからチャンネル設定を取得する（メモリ内キャッシング有効）。
  */
 export async function resolveChannels(env: Env): Promise<ChannelConfig[]> {
-	const registry = await loadChannelRegistry(env.THREAD_STORE);
+	let registry = registryCache.get(env.THREAD_STORE);
+	if (!registry) {
+		registry = await loadChannelRegistry(env.THREAD_STORE);
+		registryCache.set(env.THREAD_STORE, registry);
+	}
 	return registry.map(entryToChannelConfig);
 }
 

@@ -24,60 +24,87 @@ export async function handleMorningCron(env: Env): Promise<void> {
 		return;
 	}
 
-	for (let channel of channels) {
-		try {
-			// Canvas 未設定時に自動作成
-			if (!channel.canvasId) {
-				const slackClient = createSlackClient(env.SLACK_BOT_TOKEN);
-				const newCanvasId = await createCanvas(slackClient, `日報分析 - ${channel.label}`, '# 初期化中...');
-				await updateCanvasId(env.THREAD_STORE, channel.channelId, newCanvasId);
-				channel = { ...channel, canvasId: newCanvasId };
-				console.log(`[${channel.label}][Morning] Canvas auto-created — ${newCanvasId}`);
-			}
+	// Promise.allSettled で各チャンネルを並列処理（1チャンネルの失敗が他にブロック影響しない）
+	const results = await Promise.allSettled(
+		channels.map((channel) => processChannel(env, channel))
+	);
 
-			const { dateLabel, isoDate, oldest, latest } = getPreviousBusinessDay();
-			console.log(`[${channel.label}][Morning] Start — date: ${dateLabel} | source: ${channel.channelId} → canvas: ${channel.canvasId}`);
-
-			// 1. 前営業日の日報を取得
-			const slackClient = createSlackClient(env.SLACK_BOT_TOKEN);
-			const messages = await fetchHistory(slackClient, channel.channelId, oldest, latest);
-			console.log(`[${channel.label}][Morning] Fetched ${messages.length} messages`);
-
-			const userIds = [...new Set(messages.map((m) => m.user))];
-			const users = await fetchUsers(slackClient, userIds, env.THREAD_STORE);
-
-			// 2. 分析
-			const { dateStats, perUser, similarGroups } = await runMorningDigest({
-				messages,
-				users,
-				dateLabel,
-				llmApiKey: env.JAPANAI_API_KEY,
-				llmUserId: env.JAPANAI_USER_ID,
-			});
-
-			const canvasData = {
-				dateStats,
-				similarGroups,
-				perUser: Object.fromEntries(
-					Array.from(perUser.entries()).map(([userId, coreSummary]) => [
-						userId,
-						{ displayName: users.get(userId) ?? userId, coreSummary },
-					]),
-				),
-			};
-
-			await saveMorningThreads(env.THREAD_STORE, isoDate, channel.channelId, { canvasData });
-			console.log(`[${channel.label}][Morning] Saved KV — key: morning:${isoDate}:${channel.channelId}`);
-
-			const morningMarkdown = buildMorningCanvasMarkdown(dateLabel, canvasData);
-			await updateCanvas(slackClient, channel.canvasId!, morningMarkdown);
-			console.log(`[${channel.label}][Morning] Canvas updated — ${channel.canvasId}`);
-
-		} catch (err) {
+	// 各チャンネルエラーを個別に処理
+	results.forEach((result, index) => {
+		if (result.status === 'rejected') {
+			const channel = channels[index];
 			console.error(
-				`[${channel.label}][Morning] Failed: ${formatErrorChain(err)}`,
-				err,
+				`[${channel.label}][Morning] Failed: ${formatErrorChain(result.reason)}`,
+				result.reason,
 			);
 		}
+	});
+}
+
+/**
+ * 単一チャンネルの朝会処理
+ */
+async function processChannel(env: Env, channel: Awaited<ReturnType<typeof resolveChannels>>[0]): Promise<void> {
+	let canvasId = channel.canvasId;
+
+	// Canvas 未設定時に自動作成 + 二重チェック（KVから再確認）
+	if (!canvasId) {
+		const slackClient = createSlackClient(env.SLACK_BOT_TOKEN);
+		const newCanvasId = await createCanvas(slackClient, `日報分析 - ${channel.label}`, '# 初期化中...');
+
+		// KVから再確認（競合防止）
+		try {
+			await updateCanvasId(env.THREAD_STORE, channel.channelId, newCanvasId);
+			canvasId = newCanvasId;
+			console.log(`[${channel.label}][Morning] Canvas auto-created — ${newCanvasId}`);
+		} catch (err) {
+			// 既に設定されている場合は再度KVから読み込み
+			console.warn(`[${channel.label}][Morning] Canvas already set during update, reloading...`);
+			const registry = await import('./kv-channel-registry').then(m => m.loadChannelRegistry(env.THREAD_STORE));
+			const entry = registry.find(e => e.channelId === channel.channelId);
+			if (entry?.canvasId) {
+				canvasId = entry.canvasId;
+			} else {
+				throw err;
+			}
+		}
 	}
+
+	const { dateLabel, isoDate, oldest, latest } = getPreviousBusinessDay();
+	console.log(`[${channel.label}][Morning] Start — date: ${dateLabel} | source: ${channel.channelId} → canvas: ${canvasId}`);
+
+	// 1. 前営業日の日報を取得
+	const slackClient = createSlackClient(env.SLACK_BOT_TOKEN);
+	const messages = await fetchHistory(slackClient, channel.channelId, oldest, latest);
+	console.log(`[${channel.label}][Morning] Fetched ${messages.length} messages`);
+
+	const userIds = [...new Set(messages.map((m) => m.user))];
+	const users = await fetchUsers(slackClient, userIds, env.THREAD_STORE);
+
+	// 2. 分析
+	const { dateStats, perUser, similarGroups } = await runMorningDigest({
+		messages,
+		users,
+		dateLabel,
+		llmApiKey: env.JAPANAI_API_KEY,
+		llmUserId: env.JAPANAI_USER_ID,
+	});
+
+	const canvasData = {
+		dateStats,
+		similarGroups,
+		perUser: Object.fromEntries(
+			Array.from(perUser.entries()).map(([userId, coreSummary]) => [
+				userId,
+				{ displayName: users.get(userId) ?? userId, coreSummary },
+			]),
+		),
+	};
+
+	await saveMorningThreads(env.THREAD_STORE, isoDate, channel.channelId, { canvasData });
+	console.log(`[${channel.label}][Morning] Saved KV — key: morning:${isoDate}:${channel.channelId}`);
+
+	const morningMarkdown = buildMorningCanvasMarkdown(dateLabel, canvasData);
+	await updateCanvas(slackClient, canvasId, morningMarkdown);
+	console.log(`[${channel.label}][Morning] Canvas updated — ${canvasId}`);
 }
