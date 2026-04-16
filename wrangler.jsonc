@@ -21,8 +21,5 @@
 			"binding": "THREAD_STORE",
 			"id": "c836bab38e4b44af84a286cf97c1dfcf"
 		}
-	],
-	"vars": {
-		"CHANNELS_CONFIG": "[{\"channelId\":\"C0AP4C8HJR2\",\"type\":\"structured-digest\",\"label\":\"日報\",\"canvasId\":\"F0ARVAA4MAB\",\"digestChannelId\":\"C0AS9JMUZV0\"}]"
-	}
+	]
 }
