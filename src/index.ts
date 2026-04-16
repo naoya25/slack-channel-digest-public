@@ -34,7 +34,7 @@ export default {
 		}
 
 		// Slack イベント処理
-		const app = new SlackApp({ env });
+		const app = new SlackApp({ env, signingSecret: env.SLACK_SIGNING_SECRET });
 		app.command('/digest', digestCommandAck, digestCommandLazy);
 		return app.run(req, ctx);
 	},
