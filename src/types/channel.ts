@@ -46,14 +46,37 @@ export interface ChannelConfig {
 /**
  * KV レジストリに永続化されるチャンネル登録エントリー。
  * `ChannelConfig` に `canvasId` を持たせた形式で KV に保存される。
+ *
+ * @example
+ * {
+ *   channelId: "C0AP4C8HJR2",
+ *   type: "structured-digest",
+ *   label: "Engineering Daily Reports",
+ *   canvasId: "F123456789"
+ * }
  */
 export interface ChannelRegistryEntry {
-	/** 分析対象チャンネル ID（ソース） */
+	/**
+	 * 分析対象チャンネルの Slack ID。
+	 * `/digest register` コマンドで指定される、メッセージ取得の対象チャンネル。
+	 */
 	channelId: string;
-	/** 分析の種類 */
+	/**
+	 * 分析の種類。
+	 * 現状は `"structured-digest"` のみをサポートしている。
+	 * 今後、異なるダイジェスト形式を追加する場合、ここで区別される。
+	 */
 	type: string;
-	/** 表示名 */
+	/**
+	 * 人間が読みやすいラベル。
+	 * ログやエラーメッセージに表示される。
+	 * `/digest register` コマンドで指定される。
+	 */
 	label: string;
-	/** Canvas ID（初回 cron で自動作成後に設定） */
+	/**
+	 * この登録に対応する Slack Canvas のID。
+	 * 初回の朝会 cron (`morning-cron.ts`) で自動作成され、ここに記録される。
+	 * Canvas が未作成状態では `undefined`。
+	 */
 	canvasId?: string;
 }

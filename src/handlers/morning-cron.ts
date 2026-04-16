@@ -45,6 +45,7 @@ export async function handleMorningCron(env: Env): Promise<void> {
  * 単一チャンネルの朝会処理
  */
 async function processChannel(env: Env, channel: Awaited<ReturnType<typeof resolveChannels>>[0]): Promise<void> {
+	const PREFIX = `[${channel.label}][Morning]`;
 	let canvasId = channel.canvasId;
 
 	// Canvas 未設定時に自動作成 + 二重チェック（KVから再確認）
@@ -56,10 +57,10 @@ async function processChannel(env: Env, channel: Awaited<ReturnType<typeof resol
 		try {
 			await updateCanvasId(env.THREAD_STORE, channel.channelId, newCanvasId);
 			canvasId = newCanvasId;
-			console.log(`[${channel.label}][Morning] Canvas auto-created — ${newCanvasId}`);
+			console.log(`${PREFIX} Canvas auto-created — ${newCanvasId}`);
 		} catch (err) {
 			// 既に設定されている場合は再度KVから読み込み
-			console.warn(`[${channel.label}][Morning] Canvas already set during update, reloading...`);
+			console.warn(`${PREFIX} Canvas already set during update, reloading...`);
 			const registry = await import('./kv-channel-registry').then(m => m.loadChannelRegistry(env.THREAD_STORE));
 			const entry = registry.find(e => e.channelId === channel.channelId);
 			if (entry?.canvasId) {
@@ -71,12 +72,12 @@ async function processChannel(env: Env, channel: Awaited<ReturnType<typeof resol
 	}
 
 	const { dateLabel, isoDate, oldest, latest } = getPreviousBusinessDay();
-	console.log(`[${channel.label}][Morning] Start — date: ${dateLabel} | source: ${channel.channelId} → canvas: ${canvasId}`);
+	console.log(`${PREFIX} Start — date: ${dateLabel} | source: ${channel.channelId} → canvas: ${canvasId}`);
 
 	// 1. 前営業日の日報を取得
 	const slackClient = createSlackClient(env.SLACK_BOT_TOKEN);
 	const messages = await fetchHistory(slackClient, channel.channelId, oldest, latest);
-	console.log(`[${channel.label}][Morning] Fetched ${messages.length} messages`);
+	console.log(`${PREFIX} Fetched ${messages.length} messages`);
 
 	const userIds = [...new Set(messages.map((m) => m.user))];
 	const users = await fetchUsers(slackClient, userIds, env.THREAD_STORE);
@@ -102,9 +103,9 @@ async function processChannel(env: Env, channel: Awaited<ReturnType<typeof resol
 	};
 
 	await saveMorningThreads(env.THREAD_STORE, isoDate, channel.channelId, { canvasData });
-	console.log(`[${channel.label}][Morning] Saved KV — key: morning:${isoDate}:${channel.channelId}`);
+	console.log(`${PREFIX} Saved KV — key: morning:${isoDate}:${channel.channelId}`);
 
 	const morningMarkdown = buildMorningCanvasMarkdown(dateLabel, canvasData);
 	await updateCanvas(slackClient, canvasId, morningMarkdown);
-	console.log(`[${channel.label}][Morning] Canvas updated — ${canvasId}`);
+	console.log(`${PREFIX} Canvas updated — ${canvasId}`);
 }

@@ -36,7 +36,12 @@ export const digestCommandLazy: SlashCommandLazyHandler<Env> = async (req) => {
 				responseText = 'Invalid subcommand. Usage: `/digest register <channel_id> <label>`, `/digest unregister <channel_id>`, `/digest list`';
 				break;
 		}
-		await req.context.respond({ text: responseText });
+		try {
+			await req.context.respond({ text: responseText });
+		} catch (respondErr) {
+			console.error('[digest] respond() failed:', respondErr);
+			throw respondErr;
+		}
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
 		console.error('[digest] Error:', msg);
