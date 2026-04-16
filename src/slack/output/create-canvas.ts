@@ -11,8 +11,11 @@ interface CanvasCreateResult {
 
 /**
  * Canvas 作成結果の型ガード
+ * 成功時は result は { ok: true; canvas_id: string } に絞られる
  */
-function assertCanvasCreateSuccess(result: CanvasCreateResult): asserts result is { ok: true; canvas_id: string; error?: string } {
+function assertCanvasCreateSuccess(
+	result: CanvasCreateResult,
+): asserts result is CanvasCreateResult & { ok: true; canvas_id: string } {
 	if (!result.ok || !result.canvas_id) {
 		throw new Error(`canvases.create failed: ${result.error || 'unknown error'}`);
 	}

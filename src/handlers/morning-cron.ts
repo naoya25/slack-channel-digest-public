@@ -9,8 +9,7 @@ import { saveMorningThreads } from '../utils/kv-thread-store';
 import { updateCanvas } from '../slack/output/canvas';
 import { createCanvas } from '../slack/output/create-canvas';
 import { buildMorningCanvasMarkdown } from '../slack/output/canvas-markdown';
-import { updateCanvasId } from '../utils/kv-channel-registry';
-import type { ChannelRegistryEntry } from '../types/channel';
+import { updateCanvasId, loadChannelRegistry } from '../utils/kv-channel-registry';
 
 /**
  * 朝会フェーズ（JST 9:30 に実行）:
@@ -43,34 +42,60 @@ export async function handleMorningCron(env: Env): Promise<void> {
 }
 
 /**
+ * Canvas ID を確保する（未設定なら自動作成＋KV登録）。
+ * 競合状態を避けるため、KV読み込み → 確認 → 作成 → 登録 の順序を厳格に。
+ */
+async function ensureCanvasId(
+	env: Env,
+	channelId: string,
+	label: string,
+	PREFIX: string,
+): Promise<string> {
+	// 1. KV から最新状態を確認（他のプロセスが既に作成しているかチェック）
+	const registry = await loadChannelRegistry(env.THREAD_STORE);
+	const entry = registry.find((e) => e.channelId === channelId);
+	if (entry?.canvasId) {
+		console.log(`${PREFIX} Canvas already exists — ${entry.canvasId}`);
+		return entry.canvasId;
+	}
+
+	// 2. Canvas を新規作成
+	const slackClient = createSlackClient(env.SLACK_BOT_TOKEN);
+	const newCanvasId = await createCanvas(slackClient, `日報分析 - ${label}`, '# 初期化中...');
+
+	// 3. 再度確認 → 登録（二重チェック）
+	const latestRegistry = await loadChannelRegistry(env.THREAD_STORE);
+	const latestEntry = latestRegistry.find((e) => e.channelId === channelId);
+	if (latestEntry?.canvasId) {
+		// 他のプロセスが既に設定した → そちらを使用
+		console.log(`${PREFIX} Canvas set by concurrent process — ${latestEntry.canvasId}`);
+		return latestEntry.canvasId;
+	}
+
+	// 4. KV に登録
+	try {
+		await updateCanvasId(env.THREAD_STORE, channelId, newCanvasId);
+		console.log(`${PREFIX} Canvas auto-created — ${newCanvasId}`);
+		return newCanvasId;
+	} catch (err) {
+		// 登録失敗 → 最後にもう一度確認してから失敗判定
+		const finalRegistry = await loadChannelRegistry(env.THREAD_STORE);
+		const finalEntry = finalRegistry.find((e) => e.channelId === channelId);
+		if (finalEntry?.canvasId) {
+			return finalEntry.canvasId;
+		}
+		throw err;
+	}
+}
+
+/**
  * 単一チャンネルの朝会処理
  */
 async function processChannel(env: Env, channel: Awaited<ReturnType<typeof resolveChannels>>[0]): Promise<void> {
 	const PREFIX = `[${channel.label}][Morning]`;
-	let canvasId = channel.canvasId;
 
-	// Canvas 未設定時に自動作成 + 二重チェック（KVから再確認）
-	if (!canvasId) {
-		const slackClient = createSlackClient(env.SLACK_BOT_TOKEN);
-		const newCanvasId = await createCanvas(slackClient, `日報分析 - ${channel.label}`, '# 初期化中...');
-
-		// KVから再確認（競合防止）
-		try {
-			await updateCanvasId(env.THREAD_STORE, channel.channelId, newCanvasId);
-			canvasId = newCanvasId;
-			console.log(`${PREFIX} Canvas auto-created — ${newCanvasId}`);
-		} catch (err) {
-			// 既に設定されている場合は再度KVから読み込み
-			console.warn(`${PREFIX} Canvas already set during update, reloading...`);
-			const registry = await import('../utils/kv-channel-registry').then(m => m.loadChannelRegistry(env.THREAD_STORE));
-			const entry = registry.find((e: ChannelRegistryEntry) => e.channelId === channel.channelId);
-			if (entry?.canvasId) {
-				canvasId = entry.canvasId;
-			} else {
-				throw err;
-			}
-		}
-	}
+	// Canvas ID を確保（未設定なら自動作成）
+	const canvasId = await ensureCanvasId(env, channel.channelId, channel.label, PREFIX);
 
 	const { dateLabel, isoDate, oldest, latest } = getPreviousBusinessDay();
 	console.log(`${PREFIX} Start — date: ${dateLabel} | source: ${channel.channelId} → canvas: ${canvasId}`);
@@ -107,9 +132,6 @@ async function processChannel(env: Env, channel: Awaited<ReturnType<typeof resol
 	console.log(`${PREFIX} Saved KV — key: morning:${isoDate}:${channel.channelId}`);
 
 	const morningMarkdown = buildMorningCanvasMarkdown(dateLabel, canvasData);
-	if (!canvasId) {
-		throw new Error(`${PREFIX} Canvas ID is undefined after initialization`);
-	}
 	await updateCanvas(slackClient, canvasId, morningMarkdown);
 	console.log(`${PREFIX} Canvas updated — ${canvasId}`);
 }

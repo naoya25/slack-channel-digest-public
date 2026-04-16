@@ -47,7 +47,20 @@ export interface ChannelConfig {
  * KV レジストリに永続化されるチャンネル登録エントリー。
  * `ChannelConfig` に `canvasId` を持たせた形式で KV に保存される。
  *
+ * **ライフサイクル**:
+ * 1. `/digest register` コマンド実行時に作成（`canvasId` は未設定）
+ * 2. 初回の朝会 cron で Canvas を自動作成し、`canvasId` を更新
+ *
  * @example
+ * // 登録直後（Canvas 未作成）
+ * {
+ *   channelId: "C0AP4C8HJR2",
+ *   type: "structured-digest",
+ *   label: "Engineering Daily Reports"
+ *   // canvasId は朝会 cron で設定される
+ * }
+ *
+ * // 朝会 cron 実行後（Canvas 作成済み）
  * {
  *   channelId: "C0AP4C8HJR2",
  *   type: "structured-digest",

@@ -73,10 +73,7 @@ export async function handleEveningCron(env: Env): Promise<void> {
 			console.log(`${PREFIX} Canvas updated — ${channel.canvasId}`);
 
 		} catch (err) {
-			console.error(
-				`${PREFIX} Failed: ${formatErrorChain(err)}`,
-				err,
-			);
+			console.error(`${PREFIX} Failed: ${formatErrorChain(err)}`);
 		}
 	}
 }

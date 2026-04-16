@@ -45,7 +45,18 @@ export const digestCommandLazy: SlashCommandLazyHandler<Env> = async (req) => {
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
 		console.error('[digest] Error:', msg);
-		await req.context.respond({ text: 'Command failed. Please try again.' });
+
+		// エラー分類してユーザー向けメッセージを返す
+		let userMsg = 'Command failed. Please try again.';
+		if (msg.includes('already registered')) {
+			userMsg = '❌ This channel is already registered.';
+		} else if (msg.includes('not found')) {
+			userMsg = '❌ Channel not found. Please check the channel ID.';
+		} else if (msg.includes('Invalid channel ID')) {
+			userMsg = '❌ Invalid channel ID format. Use `C0AP4C8HJR2` or mention the channel.';
+		}
+
+		await req.context.respond({ text: userMsg });
 	}
 };
 
@@ -113,15 +124,18 @@ async function handleList(req: Parameters<SlashCommandLazyHandler<Env>>[0]): Pro
 /**
  * チャンネル ID をノーマライズ。
  * `C0AP4C8HJR2` 形式か `<#C0AP4C8HJR2|name>` 形式を受け付ける。
+ *
+ * Slack Channel ID フォーマット: C + 9文字（計10文字）
+ * https://api.slack.com/types/channel
  */
 function normalizeChannelId(raw: string): string | null {
-	// 既に C で始まる ID 形式なら OK（C + 8文字のみ）
-	if (/^C[A-Z0-9]{8}$/.test(raw)) {
+	// 既に C で始まる ID 形式なら OK（C + 9文字のみ）
+	if (/^C[A-Z0-9]{9}$/.test(raw)) {
 		return raw;
 	}
 
-	// <#C...|...> メンション形式を抽出（C + 8文字のみ）
-	const match = /<#(C[A-Z0-9]{8})\|/.exec(raw);
+	// <#C...|...> メンション形式を抽出（C + 9文字のみ）
+	const match = /<#(C[A-Z0-9]{9})\|/.exec(raw);
 	if (match) {
 		return match[1];
 	}
@@ -131,18 +145,17 @@ function normalizeChannelId(raw: string): string | null {
 
 /**
  * ラベル入力をサニタイズ。
- * Markdown記号を削除し、100文字以内に制限する。
+ * 制御文字・危険な記号を削除し、100文字以内に制限する。
  */
 function sanitizeLabel(label: string): string {
-	// Markdown記号を削除（*、_、`、~、[、]など）
-	let sanitized = label
-		.replace(/[*_`~[\]]/g, '')
-		.trim();
+	// 1. 長さ先制限（削除前）
+	let sanitized = label.slice(0, 100);
 
-	// 100文字以内に制限
-	if (sanitized.length > 100) {
-		sanitized = sanitized.substring(0, 100);
-	}
+	// 2. 制御文字を空白に置換（改行・タブなど）
+	sanitized = sanitized.replace(/[\n\r\t\x00-\x1f]/g, ' ');
 
-	return sanitized;
+	// 3. Markdown記号削除（*、_、`、~、[、]など）
+	sanitized = sanitized.replace(/[*_`~[\]]/g, '');
+
+	return sanitized.trim();
 }
