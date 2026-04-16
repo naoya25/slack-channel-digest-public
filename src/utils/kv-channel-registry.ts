@@ -9,7 +9,8 @@ export async function loadChannelRegistry(kv: KVNamespace): Promise<ChannelRegis
 	const entries: ChannelRegistryEntry[] = [];
 	let cursor: string | undefined;
 	do {
-		const { keys, list_cursor } = await kv.list({ prefix: ENTRY_KEY_PREFIX, cursor });
+		const result = await kv.list({ prefix: ENTRY_KEY_PREFIX, cursor });
+		const { keys } = result;
 		for (const key of keys) {
 			const raw = await kv.get(key.name);
 			if (raw) {
@@ -20,7 +21,7 @@ export async function loadChannelRegistry(kv: KVNamespace): Promise<ChannelRegis
 				}
 			}
 		}
-		cursor = list_cursor;
+		cursor = (result as any).cursor;
 	} while (cursor);
 	return entries;
 }

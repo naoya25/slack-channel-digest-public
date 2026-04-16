@@ -10,6 +10,7 @@ import { updateCanvas } from '../slack/output/canvas';
 import { createCanvas } from '../slack/output/create-canvas';
 import { buildMorningCanvasMarkdown } from '../slack/output/canvas-markdown';
 import { updateCanvasId } from '../utils/kv-channel-registry';
+import type { ChannelRegistryEntry } from '../types/channel';
 
 /**
  * 朝会フェーズ（JST 9:30 に実行）:
@@ -61,8 +62,8 @@ async function processChannel(env: Env, channel: Awaited<ReturnType<typeof resol
 		} catch (err) {
 			// 既に設定されている場合は再度KVから読み込み
 			console.warn(`${PREFIX} Canvas already set during update, reloading...`);
-			const registry = await import('./kv-channel-registry').then(m => m.loadChannelRegistry(env.THREAD_STORE));
-			const entry = registry.find(e => e.channelId === channel.channelId);
+			const registry = await import('../utils/kv-channel-registry').then(m => m.loadChannelRegistry(env.THREAD_STORE));
+			const entry = registry.find((e: ChannelRegistryEntry) => e.channelId === channel.channelId);
 			if (entry?.canvasId) {
 				canvasId = entry.canvasId;
 			} else {
@@ -106,6 +107,9 @@ async function processChannel(env: Env, channel: Awaited<ReturnType<typeof resol
 	console.log(`${PREFIX} Saved KV — key: morning:${isoDate}:${channel.channelId}`);
 
 	const morningMarkdown = buildMorningCanvasMarkdown(dateLabel, canvasData);
+	if (!canvasId) {
+		throw new Error(`${PREFIX} Canvas ID is undefined after initialization`);
+	}
 	await updateCanvas(slackClient, canvasId, morningMarkdown);
 	console.log(`${PREFIX} Canvas updated — ${canvasId}`);
 }
