@@ -1,5 +1,5 @@
 import type { EveningAnalysisInput, EveningAnalysisOutput } from '../types/digest';
-import { createOpenAIClient, chatCompletion } from '../llm/client';
+import { createJapanAIClient, chatCompletion } from '../llm/client';
 import { groupBy } from '../utils/group-by';
 import { mapWithConcurrency } from '../utils/map-with-concurrency';
 import { buildEveningPersonPass1Prompt, buildTeamPass2Prompt } from './digest-llm/prompts';
@@ -21,14 +21,14 @@ const MAX_CONTEXT_CHARS = 16_000;
  * 夕会向け分析: 年度累積の日報から Pass1（個人の累積の流れ・特徴）→ Pass2（類似・知見マッチング）を経て Canvas 追記用テキストを組み立てる。
  */
 export async function runEveningDigest(input: EveningAnalysisInput): Promise<EveningAnalysisOutput> {
-	const { messages, users, dateLabel, openaiApiKey } = input;
+	const { messages, users, dateLabel, llmApiKey, llmUserId } = input;
 	const userMessages = groupBy(messages, (m) => m.user);
 
 	if (userMessages.size === 0) {
 		return { perUser: new Map(), teamInsights: undefined };
 	}
 
-	const llm = createOpenAIClient(openaiApiKey);
+	const llm = createJapanAIClient(llmApiKey, llmUserId);
 	const validIds = new Set(userMessages.keys());
 
 	const entries = Array.from(userMessages.entries());
@@ -44,7 +44,7 @@ export async function runEveningDigest(input: EveningAnalysisInput): Promise<Eve
 				{ role: 'system', content: system },
 				{ role: 'user', content: user },
 			],
-			{ jsonMode: true, maxTokens: 1200 },
+			{ jsonMode: true },
 		);
 
 		const parsed = parsePersonExtraction(raw, username);
@@ -63,7 +63,7 @@ export async function runEveningDigest(input: EveningAnalysisInput): Promise<Eve
 			{ role: 'system', content: sys2 },
 			{ role: 'user', content: user2 },
 		],
-		{ jsonMode: true, maxTokens: 2200 },
+		{ jsonMode: true },
 	);
 
 	let synthesis = parseTeamSynthesis(raw2);

@@ -44,7 +44,8 @@ export async function handleMorningCron(env: Env): Promise<void> {
 				messages,
 				users,
 				dateLabel,
-				openaiApiKey: env.OPENAI_API_KEY,
+				llmApiKey: env.JAPANAI_API_KEY,
+				llmUserId: env.JAPANAI_USER_ID,
 			});
 
 			const canvasData = {

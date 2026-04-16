@@ -33,7 +33,7 @@
 - **`compatibility_flags`**: `nodejs_compat` を使う想定（アーキテクチャ・依存に合わせる）
 - **Cron**: 本番向けスケジュールは `docs/architecture.md` の値に合わせる。ローカル検証では `* * * * *` や `--test-scheduled` でよい
 - **`vars`**: 非秘密の `CHANNELS_CONFIG`（チャンネル ID・分析 `type`・Canvas ID など）を載せる想定
-- **Secrets**（リポジトリに書かない）: `SLACK_BOT_TOKEN`、`OPENAI_API_KEY` 等 → `wrangler secret put`、ローカルは `.dev.vars`（Git 対象外）
+- **Secrets**（リポジトリに書かない）: `SLACK_BOT_TOKEN`、`JAPANAI_API_KEY`、`JAPANAI_USER_ID` → `wrangler secret put`、ローカルは `.dev.vars`（Git 対象外）
 
 `wrangler.jsonc` の bindings / `vars` を変えたら **`npm run cf-typegen`（`wrangler types`）で `Env` 型を再生成**する。
 

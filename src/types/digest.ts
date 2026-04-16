@@ -12,7 +12,8 @@ export interface MorningAnalysisInput {
 	users: Map<string, string>;
 	/** 前営業日ラベル（例: `4/10(金)`） */
 	dateLabel: string;
-	openaiApiKey: string;
+	llmApiKey: string;
+	llmUserId: string;
 }
 
 /** 朝会分析の出力 */
@@ -37,7 +38,8 @@ export interface EveningAnalysisInput {
 	users: Map<string, string>;
 	/** 前営業日ラベル（例: `4/10(金)`）— プロンプト用 */
 	dateLabel: string;
-	openaiApiKey: string;
+	llmApiKey: string;
+	llmUserId: string;
 }
 
 /** 夕会分析の出力 */
