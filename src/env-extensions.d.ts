@@ -4,4 +4,5 @@
  */
 interface Env {
 	THREAD_STORE: KVNamespace;
+	SLACK_SIGNING_SECRET: string;
 }

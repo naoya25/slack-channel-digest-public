@@ -1,5 +1,5 @@
 import { formatErrorChain } from '../utils/format-error-for-log';
-import { parseChannelsConfig } from '../utils/parse-channels-config';
+import { resolveChannels } from '../utils/resolve-channels';
 import { createSlackClient } from '../slack/ingest/client';
 import { fetchHistory } from '../slack/ingest/history';
 import { fetchUsers } from '../slack/ingest/users';
@@ -14,9 +14,9 @@ import { buildEveningCanvasMarkdown } from '../slack/output/canvas-markdown';
  * 年度始め（4/1）以降の全日報を取得して累積分析し、Canvas を朝会内容に続けて上書きする。
  */
 export async function handleEveningCron(env: Env): Promise<void> {
-	const channels = parseChannelsConfig(env.CHANNELS_CONFIG);
+	const channels = await resolveChannels(env);
 	if (channels.length === 0) {
-		console.warn('[Evening] CHANNELS_CONFIG is empty — no channels to process');
+		console.warn('[Evening] No channels to process (KV registry empty, CHANNELS_CONFIG empty)');
 		return;
 	}
 

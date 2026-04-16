@@ -42,3 +42,18 @@ export interface ChannelConfig {
 	 */
 	ingestRange?: ChannelIngestRange;
 }
+
+/**
+ * KV レジストリに永続化されるチャンネル登録エントリー。
+ * `ChannelConfig` に `canvasId` を持たせた形式で KV に保存される。
+ */
+export interface ChannelRegistryEntry {
+	/** 分析対象チャンネル ID（ソース） */
+	channelId: string;
+	/** 分析の種類 */
+	type: string;
+	/** 表示名 */
+	label: string;
+	/** Canvas ID（初回 cron で自動作成後に設定） */
+	canvasId?: string;
+}

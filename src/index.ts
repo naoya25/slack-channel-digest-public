@@ -1,5 +1,7 @@
+import { SlackApp } from 'slack-cloudflare-workers';
 import { handleMorningCron } from './handlers/morning-cron';
 import { handleEveningCron } from './handlers/evening-cron';
+import { digestCommandAck, digestCommandLazy } from './slack/commands/digest';
 
 /** 朝会 — wrangler.jsonc `triggers.crons` と文字列を一致させる（Cron は UTC） */
 const MORNING_CRON = '0 21 * * *';
@@ -7,25 +9,34 @@ const MORNING_CRON = '0 21 * * *';
 const EVENING_CRON = '0 3 * * *';
 
 export default {
-	// 開発用: Worker の URL にアクセスすると試し方を表示
-	async fetch(req: Request): Promise<Response> {
-		const base = new URL(req.url);
-		base.pathname = '/__scheduled';
+	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		const url = new URL(req.url);
 
-		const morningUrl = new URL(base.href);
-		morningUrl.searchParams.set('cron', MORNING_CRON);
+		// 開発用: GET / でテストコマンドを表示
+		if (url.pathname === '/') {
+			const base = new URL(req.url);
+			base.pathname = '/__scheduled';
 
-		const eveningUrl = new URL(base.href);
-		eveningUrl.searchParams.set('cron', EVENING_CRON);
+			const morningUrl = new URL(base.href);
+			morningUrl.searchParams.set('cron', MORNING_CRON);
 
-		return new Response(
-			[
-				'Scheduled handler test commands:',
-				'',
-				`[Morning  / 朝会] curl "${morningUrl.href}"`,
-				`[Evening  / 夕会] curl "${eveningUrl.href}"`,
-			].join('\n'),
-		);
+			const eveningUrl = new URL(base.href);
+			eveningUrl.searchParams.set('cron', EVENING_CRON);
+
+			return new Response(
+				[
+					'Scheduled handler test commands:',
+					'',
+					`[Morning  / 朝会] curl "${morningUrl.href}"`,
+					`[Evening  / 夕会] curl "${eveningUrl.href}"`,
+				].join('\n'),
+			);
+		}
+
+		// Slack イベント処理
+		const app = new SlackApp({ env });
+		app.command('/digest', digestCommandAck, digestCommandLazy);
+		return app.run(req, ctx);
 	},
 
 	async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
