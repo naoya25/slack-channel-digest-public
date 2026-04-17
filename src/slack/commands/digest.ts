@@ -194,13 +194,15 @@ function sanitizeLabel(label: string): string {
 	// 1. 長さ先制限（削除前）
 	let sanitized = label.slice(0, 100);
 
-	// 2. 制御文字を削除（改行・タブ・null・SOH-US など）
-	// 許可: スペース以上の通常文字、改行、タブ
+	// 2. 制御文字を除去し、改行・CR・タブはスペースへ正規化
 	sanitized = Array.from(sanitized)
-		.filter((char) => {
+		.map((char) => {
+			if (char === '\n' || char === '\r' || char === '\t') {
+				return ' ';
+			}
+
 			const code = char.charCodeAt(0);
-			// スペース（32）以上か、改行・タブは許可
-			return code >= 32 || ['\n', '\r', '\t'].includes(char);
+			return code >= 32 ? char : '';
 		})
 		.join('');
 
