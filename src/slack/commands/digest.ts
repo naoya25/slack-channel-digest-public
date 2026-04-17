@@ -194,9 +194,17 @@ function sanitizeLabel(label: string): string {
 	// 1. 長さ先制限（削除前）
 	let sanitized = label.slice(0, 100);
 
-	// 2. 制御文字を空白に置換（改行・タブなど）
-	// eslint-disable-next-line no-control-regex
-	sanitized = sanitized.replace(/[\n\r\t\x00-\x1f]/g, ' ');
+	// 2. 制御文字を除去し、改行・CR・タブはスペースへ正規化
+	sanitized = Array.from(sanitized)
+		.map((char) => {
+			if (char === '\n' || char === '\r' || char === '\t') {
+				return ' ';
+			}
+
+			const code = char.charCodeAt(0);
+			return code >= 32 ? char : '';
+		})
+		.join('');
 
 	// 3. Markdown記号削除（*、_、`、~、[、]など）
 	sanitized = sanitized.replace(/[*_`~[\]]/g, '');
