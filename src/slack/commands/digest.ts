@@ -195,6 +195,7 @@ function sanitizeLabel(label: string): string {
 	let sanitized = label.slice(0, 100);
 
 	// 2. 制御文字を空白に置換（改行・タブなど）
+	// eslint-disable-next-line no-control-regex
 	sanitized = sanitized.replace(/[\n\r\t\x00-\x1f]/g, ' ');
 
 	// 3. Markdown記号削除（*、_、`、~、[、]など）
