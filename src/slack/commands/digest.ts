@@ -64,24 +64,35 @@ async function handleRegister(
 	req: Parameters<SlashCommandLazyHandler<Env>>[0],
 	parts: string[],
 ): Promise<string> {
-	if (parts.length < 3) {
-		return 'Usage: `/digest register <channel_id> <label>`';
+	if (parts.length < 2) {
+		return 'Usage: `/digest register <label>`';
 	}
 
-	const channelId = normalizeChannelId(parts[1]);
-	const label = sanitizeLabel(parts.slice(2).join(' '));
-
+	// 呼び出されたチャンネルを自動取得
+	const channelId = req.payload.channel_id;
 	if (!channelId) {
-		return 'Invalid channel ID format. Expected `C0AP4C8HJR2` or `<#C0...|name>`';
+		return '❌ This command must be called from a channel.';
 	}
+
+	const label = sanitizeLabel(parts.slice(1).join(' '));
+
+	// 既に登録されているかチェック
+	const registry = await loadChannelRegistry(req.env.THREAD_STORE);
+	if (registry.some((entry) => entry.channelId === channelId)) {
+		return `⚠️ This channel is already registered with label "${registry.find((entry) => entry.channelId === channelId)?.label}". Please unregister first if you want to update.`;
+	}
+
+	// Canvas を作成
+	const canvasId = await createCanvas(req.env, label);
 
 	await addChannelToRegistry(req.env.THREAD_STORE, {
 		channelId,
 		type: 'structured-digest',
 		label,
+		canvasId,
 	});
 
-	return `✓ Registered channel ${channelId} with label "${label}". Canvas will be created on next morning cron.`;
+	return `✓ Registered <#${channelId}> with label "${label}". Canvas created: <https://slack.com/files/${canvasId}|View Canvas>`;
 }
 
 async function handleUnregister(
@@ -114,11 +125,43 @@ async function handleList(req: Parameters<SlashCommandLazyHandler<Env>>[0]): Pro
 
 	const lines = ['*Registered channels:*'];
 	for (const entry of registry) {
-		const canvasStatus = entry.canvasId ? `\`${entry.canvasId}\`` : '_pending_';
-		lines.push(`• <#${entry.channelId}> — "${entry.label}" (Canvas: ${canvasStatus})`);
+		const canvasLink = entry.canvasId
+			? `<slack://canvas/${entry.canvasId}|${entry.canvasId}>`
+			: '_pending_';
+		lines.push(`• <#${entry.channelId}> — "${entry.label}" (Canvas: ${canvasLink})`);
 	}
 
 	return lines.join('\n');
+}
+
+/**
+ * Canvas を Slack API で作成する
+ */
+async function createCanvas(env: Env, title: string): Promise<string> {
+	const token = env.SLACK_BOT_TOKEN;
+
+	const response = await fetch('https://slack.com/api/canvases.create', {
+		method: 'POST',
+		headers: {
+			'Authorization': `Bearer ${token}`,
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify({
+			title,
+			content: {
+				type: 'markdown',
+				markdown: `# ${title}\n\n*Created by Slack Channel Digest*`,
+			},
+		}),
+	});
+
+	const data = (await response.json()) as { ok: boolean; canvas_id?: string; error?: string };
+
+	if (!data.ok) {
+		throw new Error(`Failed to create canvas: ${data.error || 'unknown error'}`);
+	}
+
+	return data.canvas_id || '';
 }
 
 /**
